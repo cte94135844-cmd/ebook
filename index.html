@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bibliothèque — 私設図書館</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+<style>
+:root {
+  --bg:     #f7f3ec;
+  --bg2:    #efe9de;
+  --bg3:    #e5ddd0;
+  --ink:    #1c1710;
+  --ink2:   #3a3020;
+  --ink3:   #6b5e48;
+  --accent: #8b3a1a;
+  --acc2:   #c4622d;
+  --gold:   #b8860b;
+  --line:   #d0c4b0;
+  --white:  #fdfaf5;
+  --sh:     rgba(28,23,16,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Noto Serif JP',serif;min-height:100vh;overflow-x:hidden}
+
+/* noise */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  opacity:.45}
+
+/* ═══ LOGIN ═══ */
+#ls{position:fixed;inset:0;z-index:999;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  transition:opacity .7s,visibility .7s}
+#ls.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#ls::before{content:'';position:absolute;inset:-50%;
+  background:repeating-linear-gradient(-55deg,transparent,transparent 40px,rgba(184,134,11,.04) 40px,rgba(184,134,11,.04) 41px)}
+.li{position:relative;text-align:center;width:min(420px,92vw)}
+.le{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);opacity:.7;margin-bottom:18px}
+.lt{font-family:'Playfair Display',serif;font-size:clamp(40px,8vw,70px);font-weight:400;color:var(--white);line-height:1;margin-bottom:4px}
+.lt em{font-style:italic;color:var(--acc2)}
+.ls2{font-family:'Noto Serif JP',serif;font-size:12px;letter-spacing:.25em;color:rgba(253,250,245,.38);margin-bottom:44px}
+.lr{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin-bottom:32px;opacity:.4}
+.lf label{display:block;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.4em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;text-align:left}
+.lf input{width:100%;background:rgba(253,250,245,.06);border:none;border-bottom:1px solid rgba(184,134,11,.5);
+  color:var(--white);font-family:'Playfair Display',serif;font-size:24px;padding:12px 14px;outline:none;letter-spacing:.08em;transition:border-color .3s}
+.lf input:focus{border-bottom-color:var(--gold)}
+.lf input::placeholder{opacity:.22;font-style:italic}
+.lerr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:#e07050;margin-top:10px;min-height:16px;text-align:left}
+.lbtn{margin-top:28px;width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);
+  font-family:'Playfair Display',serif;font-size:14px;letter-spacing:.4em;padding:16px;cursor:pointer;transition:all .3s}
+.lbtn:hover{background:var(--gold);color:var(--ink)}
+
+/* ═══ APP ═══ */
+#app{opacity:0;transition:opacity .8s ease .2s;position:relative;z-index:1}
+#app.visible{opacity:1}
+
+/* header */
+header{position:sticky;top:0;z-index:50;background:rgba(247,243,236,.9);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw,48px);height:60px;
+  display:flex;align-items:center;gap:18px}
+.hlogo{font-family:'Playfair Display',serif;font-size:20px;font-weight:400;color:var(--ink);flex-shrink:0;letter-spacing:.04em}
+.hlogo em{font-style:italic;color:var(--accent)}
+.hsw{flex:1;max-width:340px;position:relative}
+.hsw input{width:100%;background:var(--bg3);border:1px solid var(--line);color:var(--ink);
+  font-family:'Noto Serif JP',serif;font-size:13px;padding:8px 34px 8px 14px;outline:none;transition:border-color .25s,background .25s}
+.hsw input:focus{background:var(--white);border-color:var(--accent)}
+.hsw span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink3);pointer-events:none}
+.hcnt{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink3);letter-spacing:.1em;margin-left:auto;white-space:nowrap}
+.hout{background:transparent;border:1px solid var(--line);color:var(--ink3);font-family:'DM Mono',monospace;
+  font-size:9px;letter-spacing:.3em;text-transform:uppercase;padding:6px 12px;cursor:pointer;transition:all .2s;flex-shrink:0}
+.hout:hover{border-color:var(--accent);color:var(--accent)}
+
+/* filters */
+.fb{background:var(--bg2);border-bottom:1px solid var(--line);padding:13px clamp(16px,4vw,48px);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink3);margin-right:4px;flex-shrink:0}
+.fbtn{background:transparent;border:1px solid var(--line);color:var(--ink3);font-family:'Noto Serif JP',serif;
+  font-size:11px;letter-spacing:.1em;padding:4px 14px;cursor:pointer;transition:all .2s}
+.fbtn:hover{border-color:var(--accent);color:var(--accent)}
+.fbtn.on{border-color:var(--accent);background:var(--accent);color:var(--white)}
+.fsort{margin-left:auto;background:var(--bg);border:1px solid var(--line);color:var(--ink);
+  font-family:'Noto Serif JP',serif;font-size:11px;padding:5px 12px;cursor:pointer;outline:none}
+
+/* grid */
+.lw{padding:clamp(20px,4vw,48px);max-width:1600px;margin:0 auto}
+.slabel{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.45em;text-transform:uppercase;color:var(--ink3);
+  margin-bottom:22px;display:flex;align-items:center;gap:12px}
+.slabel::after{content:'';flex:1;height:1px;background:var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:clamp(14px,2.5vw,30px)}
+
+/* card */
+.card{cursor:pointer;animation:rise .5s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.cov{position:relative;aspect-ratio:2/3;overflow:hidden;
+  box-shadow:3px 5px 18px var(--sh),0 0 0 .5px rgba(28,23,16,.1);
+  transition:box-shadow .3s,transform .3s}
+.card:hover .cov{transform:translateY(-4px) rotate(.5deg);box-shadow:6px 14px 32px var(--sh)}
+.cov img{width:100%;height:100%;object-fit:cover;display:block}
+.cpg{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:16px 13px}
+.cr{width:30px;height:1px;background:rgba(253,250,245,.3)}
+.ct{font-family:'Noto Serif JP',serif;font-size:11px;color:rgba(253,250,245,.85);text-align:center;line-height:1.7;word-break:break-all}
+.ca{font-family:'Playfair Display',serif;font-style:italic;font-size:9px;color:rgba(253,250,245,.42);text-align:center}
+.fbadge{position:absolute;top:7px;right:7px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.15em;padding:2px 6px}
+.fpdf{background:rgba(139,58,26,.9);color:#fddbc8}
+.fepub{background:rgba(28,23,16,.8);color:var(--gold);border:1px solid rgba(184,134,11,.5)}
+.cha{position:absolute;inset:0;background:rgba(28,23,16,.76);display:flex;align-items:center;justify-content:center;gap:9px;opacity:0;transition:opacity .25s}
+.card:hover .cha{opacity:1}
+.hbtn{background:transparent;border:1px solid rgba(253,250,245,.6);color:var(--white);font-family:'Playfair Display',serif;
+  font-size:11px;letter-spacing:.2em;padding:8px 13px;cursor:pointer;transition:all .2s}
+.hbtn:hover{background:var(--white);color:var(--ink)}
+.hbtn.gd{border-color:var(--gold);color:var(--gold)}
+.hbtn.gd:hover{background:var(--gold);color:var(--ink)}
+.cmeta{padding:9px 2px 0}
+.ctitle{font-family:'Noto Serif JP',serif;font-size:12.5px;color:var(--ink);line-height:1.65;margin-bottom:2px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cauthor{font-family:'Playfair Display',serif;font-style:italic;font-size:11px;color:var(--ink3)}
+.cgenre{display:inline-block;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--accent);border:1px solid rgba(139,58,26,.3);padding:2px 7px;margin-top:5px}
+.empty{grid-column:1/-1;text-align:center;padding:80px 20px;color:var(--ink3)}
+.empty-i{font-size:40px;margin-bottom:14px;opacity:.4}
+.empty p{font-family:'Playfair Display',serif;font-size:17px;font-style:italic}
+
+/* ═══ MODAL ═══ */
+#modal{display:none;position:fixed;inset:0;z-index:200;background:rgba(28,23,16,.96);flex-direction:column}
+#modal.open{display:flex}
+.mtop{display:flex;align-items:center;gap:12px;padding:13px clamp(14px,3vw,30px);
+  background:var(--ink2);border-bottom:1px solid rgba(253,250,245,.08);flex-shrink:0;flex-wrap:wrap}
+.mcls{background:transparent;border:1px solid rgba(253,250,245,.2);color:rgba(253,250,245,.6);
+  width:34px;height:34px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.mcls:hover{border-color:#e07050;color:#e07050}
+.minfo{flex:1;min-width:0}
+.mtitle{font-family:'Playfair Display',serif;font-size:18px;font-weight:400;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mauthor{font-family:'Noto Serif JP',serif;font-size:12px;color:rgba(253,250,245,.42);margin-top:2px}
+.enav{display:none;align-items:center;gap:8px}
+.enav.show{display:flex}
+.nbtn{background:transparent;border:1px solid rgba(253,250,245,.2);color:rgba(253,250,245,.7);
+  width:34px;height:34px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.nbtn:hover{border-color:var(--gold);color:var(--gold)}
+.npg{font-family:'DM Mono',monospace;font-size:10px;color:rgba(253,250,245,.38);letter-spacing:.1em;white-space:nowrap}
+.mdl{background:transparent;border:1px solid var(--gold);color:var(--gold);font-family:'Playfair Display',serif;
+  font-size:11px;letter-spacing:.3em;padding:8px 16px;cursor:pointer;transition:all .2s;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.mdl:hover{background:var(--gold);color:var(--ink)}
+.mbody{flex:1;overflow:hidden;position:relative}
+.mbody iframe{width:100%;height:100%;border:none;background:#fff}
+#epw{width:100%;height:100%;background:var(--white);position:relative;overflow:hidden}
+#epv{width:100%;height:100%}
+.eload{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--white)}
+.espin{width:30px;height:30px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.eload p{font-family:'Playfair Display',serif;font-size:14px;font-style:italic;color:var(--ink3)}
+.epz{position:absolute;top:0;bottom:0;width:80px;cursor:pointer;z-index:5;opacity:0;
+  display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--ink3);
+  background:linear-gradient(90deg,rgba(247,243,236,.7),transparent);transition:opacity .2s}
+.enz{right:0;left:auto;background:linear-gradient(270deg,rgba(247,243,236,.7),transparent)}
+#epw:hover .epz,#epw:hover .enz{opacity:1}
+
+@media(max-width:700px){
+  .hcnt{display:none}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr))}
+  .hsw{flex:1}
+  .mtop{gap:8px}
+  .mdl{padding:6px 10px;font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="ls">
+  <div class="li">
+    <div class="le">Accès Privé</div>
+    <h1 class="lt">Biblio<em>thèque</em></h1>
+    <p class="ls2">私設図書館 — コレクション</p>
+    <div class="lr"></div>
+    <div class="lf">
+      <label for="pw">アクセスキー</label>
+      <input type="password" id="pw" placeholder="パスワードを入力">
+      <div class="lerr" id="lerr"></div>
+    </div>
+    <button class="lbtn" onclick="doLogin()">入 館 す る</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="hlogo">Biblio<em>thèque</em></div>
+    <div class="hsw">
+      <input type="text" id="q" placeholder="書名・著者で検索…" oninput="render()">
+      <span>⌕</span>
+    </div>
+    <div class="hcnt" id="cnt"></div>
+    <button class="hout" onclick="doLogout()">退 館</button>
+  </header>
+
+  <div class="fb">
+    <span class="fl">Filter</span>
+    <button class="fbtn on" data-f="all" onclick="setF(this)">すべて</button>
+    <button class="fbtn" data-f="pdf" onclick="setF(this)">PDF</button>
+    <button class="fbtn" data-f="epub" onclick="setF(this)">EPUB</button>
+    <span id="gb"></span>
+    <select class="fsort" id="sort" onchange="render()">
+      <option value="default">登録順</option>
+      <option value="title">タイトル順</option>
+      <option value="author">著者順</option>
+      <option value="year">刊行年順</option>
+    </select>
+  </div>
+
+  <div class="lw">
+    <div class="slabel">蔵書一覧</div>
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div class="mtop">
+    <button class="mcls" onclick="closeModal()">✕</button>
+    <div class="minfo">
+      <div class="mtitle" id="mt"></div>
+      <div class="mauthor" id="ma"></div>
+    </div>
+    <div class="enav" id="enav">
+      <button class="nbtn" onclick="ePrev()">‹</button>
+      <span class="npg" id="npg"></span>
+      <button class="nbtn" onclick="eNext()">›</button>
+    </div>
+    <a class="mdl" id="mdl" href="#" download>↓ 保存</a>
+  </div>
+  <div class="mbody" id="mb"></div>
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   ★ 設定エリア
+════════════════════════════════════════ */
+
+// ▼ パスワードを変更してください
+const PASSWORD = "cte2026";
+
+// ▼ ジャンル別カバー色 [上, 下]
+const GC = {
+  "小説":    ["#1b2e3c","#0d1a24"],
+  "文学":    ["#2b1e0e","#160f07"],
+  "技術":    ["#0d2b1a","#071510"],
+  "デザイン":["#2b1a2b","#160d16"],
+  "歴史":    ["#2b2310","#160e05"],
+  "哲学":    ["#1a1a2b","#0d0d16"],
+  "実用":    ["#2b1414","#160a0a"],
+  "科学":    ["#0d2228","#071114"],
+  "芸術":    ["#2a1820","#150c10"],
+};
+
+// ▼ 書籍データ — ここに追加していきます
+//   format: "pdf" または "epub"
+//   file:   "books/ファイル名.pdf" （サーバー上の相対パス）
+//   cover:  カバー画像パス（省略可、省略するとタイトル背表紙を自動生成）
+const BOOKS = [
+  {
+    id:1, title:"吾輩は猫である", author:"夏目漱石", year:1905,
+    genre:"小説", format:"epub", file:"books/wagahai.epub", cover:""
+  },
+  {
+    id:2, title:"銀河鉄道の夜", author:"宮沢賢治", year:1934,
+    genre:"小説", format:"epub", file:"books/ginga.epub", cover:""
+  },
+  {
+    id:3, title:"坊ちゃん", author:"夏目漱石", year:1906,
+    genre:"小説", format:"pdf", file:"books/botchan.pdf", cover:""
+  },
+  {
+    id:4, title:"デザインの基礎", author:"サンプル著者", year:2020,
+    genre:"デザイン", format:"pdf", file:"books/design.pdf", cover:""
+  },
+  {
+    id:5, title:"JavaScript完全ガイド", author:"技術者A", year:2022,
+    genre:"技術", format:"pdf", file:"books/js.pdf", cover:""
+  },
+  {
+    id:6, title:"世界史概論", author:"歴史学研究会", year:2019,
+    genre:"歴史", format:"epub", file:"books/worldhistory.epub", cover:""
+  },
+  {
+    id:7, title:"料理の科学", author:"田中花子", year:2021,
+    genre:"実用", format:"epub", file:"books/cooking.epub", cover:""
+  },
+  {
+    id:8, title:"哲学入門", author:"鈴木一郎", year:2018,
+    genre:"哲学", format:"pdf", file:"books/philosophy.pdf", cover:""
+  },
+  {
+    id:9, title:"量子力学の世界", author:"物理研究所", year:2023,
+    genre:"科学", format:"epub", file:"books/quantum.epub", cover:""
+  },
+  {
+    id:10, title:"UXデザイン実践", author:"デザイナーB", year:2021,
+    genre:"デザイン", format:"pdf", file:"books/ux.pdf", cover:""
+  }
+];
+
+/* ════════════════════════════════════════
+   APP
+════════════════════════════════════════ */
+let curF = 'all';
+let epBook = null, epRend = null;
+
+// auth
+document.getElementById('pw').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin() });
+function doLogin(){
+  const v = document.getElementById('pw').value;
+  if(v === PASSWORD){
+    document.getElementById('ls').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    initApp();
+  } else {
+    const el = document.getElementById('lerr');
+    el.textContent='— アクセスキーが正しくありません —';
+    document.getElementById('pw').value='';
+    setTimeout(()=>el.textContent='', 3000);
+  }
+}
+function doLogout(){
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('ls').classList.remove('hidden');
+  document.getElementById('pw').value='';
+}
+
+function initApp(){
+  const genres = [...new Set(BOOKS.map(b=>b.genre).filter(Boolean))];
+  const gb = document.getElementById('gb');
+  genres.forEach(g=>{
+    const b = document.createElement('button');
+    b.className='fbtn'; b.dataset.f='g:'+g; b.textContent=g;
+    b.onclick=()=>setF(b); gb.appendChild(b);
+  });
+  render();
+}
+
+function setF(btn){
+  curF = btn.dataset.f;
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  render();
+}
+
+function render(){
+  const q = (document.getElementById('q').value||'').toLowerCase();
+  const sort = document.getElementById('sort').value;
+  let list = BOOKS.filter(b=>{
+    const mf = curF==='all'?true:curF==='pdf'?b.format==='pdf':curF==='epub'?b.format==='epub':
+               curF.startsWith('g:')?b.genre===curF.slice(2):true;
+    const mq = !q||(b.title&&b.title.toLowerCase().includes(q))||(b.author&&b.author.toLowerCase().includes(q));
+    return mf&&mq;
+  });
+  if(sort==='title')  list.sort((a,b)=>a.title.localeCompare(b.title,'ja'));
+  if(sort==='author') list.sort((a,b)=>(a.author||'').localeCompare(b.author||'','ja'));
+  if(sort==='year')   list.sort((a,b)=>(b.year||0)-(a.year||0));
+
+  document.getElementById('cnt').textContent=`${list.length} / ${BOOKS.length} 冊`;
+  const grid = document.getElementById('grid');
+  grid.innerHTML='';
+
+  if(!list.length){
+    grid.innerHTML=`<div class="empty"><div class="empty-i">📚</div><p>該当する書籍がありません</p></div>`;
+    return;
+  }
+
+  list.forEach((book,i)=>{
+    const [c1,c2]=GC[book.genre]||['#1a1a1a','#0d0d0d'];
+    const covH = book.cover
+      ? `<img src="${book.cover}" alt="${book.title}" loading="lazy">`
+      : `<div class="cpg" style="background:linear-gradient(160deg,${c1},${c2})">
+           <div class="cr"></div>
+           <div class="ct">${book.title}</div>
+           <div class="ca">${book.author||''}</div>
+           <div class="cr"></div>
+         </div>`;
+    const card = document.createElement('div');
+    card.className='card';
+    card.style.animationDelay=Math.min(i*.04,.28)+'s';
+    card.innerHTML=`
+      <div class="cov">
+        ${covH}
+        <span class="fbadge f${book.format}">${book.format.toUpperCase()}</span>
+        <div class="cha">
+          <button class="hbtn gd" onclick="openBook(${book.id},event)">閲覧</button>
+          <button class="hbtn"    onclick="dlBook(${book.id},event)">保存</button>
+        </div>
+      </div>
+      <div class="cmeta">
+        <div class="ctitle">${book.title}</div>
+        <div class="cauthor">${book.author||''}</div>
+        ${book.genre?`<span class="cgenre">${book.genre}</span>`:''}
+      </div>`;
+    card.querySelector('.cov').addEventListener('click',()=>openBook(book.id));
+    grid.appendChild(card);
+  });
+}
+
+function openBook(id, e){
+  if(e) e.stopPropagation();
+  const book = BOOKS.find(b=>b.id===id); if(!book) return;
+  document.getElementById('mt').textContent  = book.title;
+  document.getElementById('ma').textContent  = book.author?`— ${book.author}`:'';
+  const dl=document.getElementById('mdl');
+  dl.href=book.file; dl.download=book.title+'.'+book.format;
+  const mb=document.getElementById('mb');
+  mb.innerHTML='';
+  if(book.format==='pdf'){
+    document.getElementById('enav').classList.remove('show');
+    mb.innerHTML=`<iframe src="${book.file}" title="${book.title}"></iframe>`;
+  } else {
+    openEpub(book, mb);
+  }
+  document.getElementById('modal').classList.add('open');
+}
+
+function dlBook(id, e){
+  if(e) e.stopPropagation();
+  const book=BOOKS.find(b=>b.id===id); if(!book) return;
+  const a=document.createElement('a'); a.href=book.file; a.download=book.title+'.'+book.format; a.click();
+}
+
+// EPUB reader
+function openEpub(book, container){
+  if(epBook){try{epBook.destroy()}catch(e){} epBook=null;epRend=null;}
+  const wrap=document.createElement('div'); wrap.id='epw';
+  wrap.innerHTML=`<div id="epv"></div>
+    <div class="eload" id="eload"><div class="espin"></div><p>読み込み中…</p></div>
+    <div class="epz" onclick="ePrev()">‹</div>
+    <div class="epz enz" onclick="eNext()">›</div>`;
+  container.appendChild(wrap);
+
+  try{
+    epBook=ePub(book.file);
+    epRend=epBook.renderTo('epv',{width:'100%',height:'100%',spread:'none'});
+    epRend.display().then(()=>{
+      const el=document.getElementById('eload'); if(el) el.style.display='none';
+      document.getElementById('enav').classList.add('show');
+      updNav();
+    }).catch(err=>showEpubErr(book));
+    epRend.on('relocated',()=>updNav());
+    epRend.on('keydown',e=>{
+      if(e.key==='ArrowRight') eNext();
+      if(e.key==='ArrowLeft')  ePrev();
+    });
+  }catch(err){ showEpubErr(book); }
+}
+
+function showEpubErr(book){
+  document.getElementById('enav').classList.remove('show');
+  const w=document.getElementById('epw'); if(!w) return;
+  w.innerHTML=`<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;background:#f9f5ee;padding:40px;text-align:center;">
+    <div style="font-size:44px">📖</div>
+    <p style="font-family:'Playfair Display',serif;font-size:16px;font-style:italic;color:#1c1710">
+      <strong>${book.title}</strong></p>
+    <p style="font-size:13px;line-height:1.9;color:#6b5e48">
+      EPUBファイルをサーバーに配置すると<br>ここでインライン表示されます。<br>
+      ダウンロードしてEPUBリーダーでもお読みいただけます。</p>
+    <a href="${book.file}" download="${book.title}.epub"
+       style="border:1px solid #8b3a1a;color:#8b3a1a;padding:10px 24px;
+              font-family:'Playfair Display',serif;font-size:12px;letter-spacing:.3em;text-decoration:none">
+      ↓ EPUBをダウンロード</a>
+  </div>`;
+}
+
+function ePrev(){ if(epRend) epRend.prev().then(updNav); }
+function eNext(){ if(epRend) epRend.next().then(updNav); }
+function updNav(){
+  if(!epRend||!epBook) return;
+  const pg=document.getElementById('npg'); if(!pg) return;
+  try{
+    const loc=epRend.currentLocation();
+    pg.textContent=`${loc.start.index+1} / ${epBook.spine.items.length}`;
+  }catch(e){ pg.textContent=''; }
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('enav').classList.remove('show');
+  document.getElementById('mb').innerHTML='';
+  if(epBook){try{epBook.destroy()}catch(e){} epBook=null;epRend=null;}
+}
+
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('modal').classList.contains('open')) return;
+  if(e.key==='Escape') closeModal();
+  if(e.key==='ArrowRight') eNext();
+  if(e.key==='ArrowLeft')  ePrev();
+});
+document.getElementById('modal').addEventListener('click', e=>{
+  if(e.target===document.getElementById('modal')) closeModal();
+});
+</script>
+</body>
+</html>
